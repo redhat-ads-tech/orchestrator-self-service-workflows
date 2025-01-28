@@ -6,6 +6,7 @@
 
 WORKFLOWS = \
 	greeting \
+	create-ocp-namespace \
 	$(NULL)
 
 # Dynamic rule patten that uses one of the workflows and sets the workflow id

@@ -1,0 +1,234 @@
+id: create-ocp-namespace
+version: '1.0'
+specVersion: '0.8'
+name: 'Create OpenShift Namespace'
+description: 'Creating an OpenShift Namespace'
+dataInputSchema: schemas/create-ocp-namespace-schema.json
+extensions:
+  - extensionid: workflow-output-schema
+    outputSchema: schemas/workflow-output-schema.json
+  - extensionid: workflow-uri-definitions
+    definitions:
+      notifications: "https://raw.githubusercontent.com/btison/pe-workshop-serverless-workflows/refs/heads/main/workflows/shared/specs/notifications-openapi.yaml"
+functions:
+  - name: createTicket
+    operation: specs/ticket-manager-openapi.yaml#createTicket
+  - name: getTicket
+    operation: specs/ticket-manager-openapi.yaml#getTicketById
+  - name: closeTicket
+    operation: specs/ticket-manager-openapi.yaml#transitionTicket
+  - name: createCoreV1Namespace
+    operation: specs/ocp-namespace-openapi.yaml#createCoreV1Namespace
+  - name: readCoreV1Namespace
+    operation: specs/ocp-namespace-openapi.yaml#readCoreV1Namespace
+  - name: createNotification
+    operation: notifications#createNotification
+  - name: sysoutFunction
+    type: custom
+    operation: sysout
+  - name: successResult
+    type: expression
+    operation: '{
+        "result": {
+          "message": "Namespace " + .namespace + " active",
+          "outputs":[]
+        }
+      }'
+  - name: errorNamespaceNotActiveResult
+    type: expression
+    operation: '{
+        "result": {
+          "message": "Namespace " + .namespace + " not active"
+        }
+      }'
+  - name: errorDeniedResult
+    type: expression
+    operation: '{
+        "result": {
+          "message": "Creation of namespace " + .namespace + " denied",
+          "outputs":[
+            {
+                "key":"Ticket",
+                "value": $SECRET.ticket_manager_url + "/rest/api/v1/ticket/" + .createTicketResult.id,
+                "format":"link"
+            }]
+          }
+      }'
+start: 'Open Ticket for Operations'
+states:
+  - name: 'Open Ticket for Operations'
+    type: operation
+    actionMode: sequential
+    actions:
+      - name: 'Create Ticket'
+        functionRef:
+          refName: createTicket
+          arguments:
+            type: 'Task'
+            labels:
+              - rhdh-workflow
+              - '"workflowId=" + $WORKFLOW.instanceId'
+            project: 'rhdh-operations'
+            summary: '"Request authorization to create namespace " + .namespace'
+        actionDataFilter:
+          toStateData: .createTicketResult
+      - name: 'sysoutNotification'
+        functionRef:
+          refName: sysoutFunction
+          arguments:
+            message: '.createTicketResult'
+    transition: 'Create Notification: Ticket Created'
+  - name: 'Create Notification: Ticket Created'
+    type: operation
+    actions:
+      - name: "Create notification: ticket created"
+        functionRef:
+          refName: createNotification
+          arguments:
+            recipients:
+              type: "entity"
+              entityRef: .recipients
+            payload:
+              title: "Ticket created"
+              description: "Ticket created"
+              topic: "Create OCP Namespace workflow"
+              link: '$SECRET.ticket_manager_url + "/rest/api/v1/ticket/" + .createTicketResult.id'
+              severity: "normal"
+    transition: 'Poll Ticket'
+  - name: 'Poll Ticket'
+    type: operation
+    actions:
+      - name: 'get issue'
+        actionDataFilter:
+          toStateData: .getTicketResult
+        functionRef:
+          refName: getTicket
+          arguments:
+            ticketId: .createTicketResult.id
+        sleep:
+          before: PT60S
+    transition: 'Check Ticket Status'
+  - name: 'Check Ticket Status'
+    type: switch
+    dataConditions:
+      - name: Resource request denied
+        condition: .getTicketResult.status == "Denied"
+        transition: 'Close ticket - Namespace Creation Denied'
+      - name: Resource request authorized
+        condition: .getTicketResult.status == "Approved"
+        transition: 'Create Namespace'
+    defaultCondition:
+      transition:
+        nextState: 'Poll Ticket'
+  - name: 'Create Namespace'
+    type: operation
+    actions:
+      - name: 'Create OCP Namespace'
+        functionRef:
+          refName: createCoreV1Namespace
+          arguments:
+            kind: Namespace
+            metadata:
+              name: .namespace
+              labels:
+                kubernetes.io/metadata.name: .namespace
+            spec:
+              finalizers:
+                - kubernetes
+    transition:
+      nextState: 'Post operation: get namespace resource'
+  - name: 'Post operation: get namespace resource'
+    type: operation
+    actions:
+      - name: "Get created namespace"
+        sleep:
+          before: PT10S
+        actionDataFilter:
+          toStateData: .namespaceObject
+        functionRef:
+          refName: readCoreV1Namespace
+          arguments:
+            name: .namespace
+    transition:
+      nextState: 'Close ticket'
+  - name: 'Close ticket'
+    type: operation
+    actionMode: sequential
+    actions:
+      - name: Close ticket
+        actionDataFilter:
+          toStateData: .closeTicketResult
+        functionRef:
+          refName: closeTicket
+          arguments:
+            ticketId: .createTicketResult.id
+            status: "Closed"
+    transition:
+      nextState: 'Post operation: check namespace resource created successfully'
+  - name: 'Post operation: check namespace resource created successfully'
+    type: switch
+    dataConditions:
+      - name: Namespace Active
+        condition: .namespaceObject.status.phase == "Active"
+        transition: 'Notify namespace active'
+    defaultCondition:
+      transition:
+        nextState: 'Notify namespace not active'
+  - name: 'Notify namespace active'
+    type: operation
+    actions:
+      - name: 'Create notification: project active'
+        functionRef:
+          refName: createNotification
+          arguments:
+            recipients:
+              type: 'entity'
+              entityRef: .recipients
+            payload:
+              title: '"Namespace " + .namespace + " active"'
+              description: '"Namespace " + .namespace + " active"'
+              topic: "Create OCP Namespace workflow"
+              severity: "normal"
+      - name: setOutput
+        functionRef:
+          refName: successResult
+    end: true
+  - name: 'Notify namespace not active'
+    type: operation
+    metadata:
+      errorMessage: '"Namespace " + .namespace + " not active"'
+    actions:
+      - name: "Create notification: namespace not active"
+        functionRef:
+          refName: createNotification
+          arguments:
+            recipients:
+              type: "entity"
+              entityRef: .recipients
+            payload:
+              title: '"Namespace " + ..namespace + " inactive"'
+              description: '"Namespace " + .namespace + " inactive"'
+              topic: "Create OCP Namespace workflow"
+              severity: "high"
+      - name: setOutput
+        functionRef:
+          refName: errorNamespaceNotActiveResult
+    end: true
+  - name: 'Close ticket - Namespace Creation Denied'
+    type: operation
+    actionMode: sequential
+    metadata:
+      errorMessage: '"Creation of namespace " + .namespace + " denied"'
+    actions:
+      - name: setOutput
+        functionRef:
+          refName: errorDeniedResult
+      - name: Close ticket
+        actionDataFilter:
+          toStateData: .closeTicketResult
+        functionRef:
+          refName: closeTicket
+          arguments:
+            ticketId: .createTicketResult.id
+            status: "Closed"
+    end: true
