@@ -21,6 +21,8 @@ functions:
     operation: specs/ocp-namespace-openapi.yaml#createCoreV1Namespace
   - name: readCoreV1Namespace
     operation: specs/ocp-namespace-openapi.yaml#readCoreV1Namespace
+  - name: createRbacAuthorizationV1NamespacedRoleBinding
+    operation: specs/ocp-rolebinding-openapi.yaml#createRbacAuthorizationV1NamespacedRoleBinding
   - name: createNotification
     operation: notifications#createNotification
   - name: sysoutFunction
@@ -72,11 +74,6 @@ states:
             summary: '"Request authorization to create namespace " + .namespace'
         actionDataFilter:
           toStateData: .createTicketResult
-      - name: 'sysoutNotification'
-        functionRef:
-          refName: sysoutFunction
-          arguments:
-            message: '.createTicketResult'
     transition: 'Create Notification: Ticket Created'
   - name: 'Create Notification: Ticket Created'
     type: operation
@@ -170,10 +167,33 @@ states:
     dataConditions:
       - name: Namespace Active
         condition: .namespaceObject.status.phase == "Active"
-        transition: 'Notify namespace active'
+        transition: 'Create rolebinding for namespace requester'
     defaultCondition:
       transition:
         nextState: 'Notify namespace not active'
+  - name: 'Create rolebinding for namespace requester'
+    type: operation
+    actions:
+      - name: 'Create rolebinding'
+        functionRef:
+          refName: createRbacAuthorizationV1NamespacedRoleBinding
+          arguments:
+            namespace: .namespace
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: RoleBinding
+            metadata:
+              name: '.openshiftUser + "-edit"'
+              namespace: .namespace
+            roleRef:
+              kind: ClusterRole
+              name: edit
+              apiGroup: rbac.authorization.k8s.io
+            subjects:
+              - kind: User
+                name: .openshiftUser
+                apiGroup: rbac.authorization.k8s.io
+    transition:
+      nextState: 'Notify namespace active'
   - name: 'Notify namespace active'
     type: operation
     actions:
