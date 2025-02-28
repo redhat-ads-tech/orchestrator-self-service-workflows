@@ -1,0 +1,242 @@
+id: create-ocp-namespace-swt
+version: '1.0'
+specVersion: '0.8'
+name: 'Create OpenShift Namespace'
+description: 'Creating an OpenShift Namespace'
+dataInputSchema: schemas/create-ocp-namespace-swt-schema.json
+functions:
+  - name: createTicket
+    operation: specs/ticket-manager-openapi.yaml#createTicket
+  - name: getTicket
+    operation: specs/ticket-manager-openapi.yaml#getTicketById
+  - name: closeTicket
+    operation: specs/ticket-manager-openapi.yaml#transitionTicket
+  - name: createNotification
+    operation: specs/notifications-openapi.yaml#createNotification
+  - name: launchSoftwareTemplate
+    operation: specs/scaffolder-openapi.yaml#createTask
+  - name: getSoftwareTemplateTask
+    operation: specs/scaffolder-openapi.yaml#getTaskDetails
+  - name: logInfo
+    type: custom
+    operation: "sysout:INFO"
+  - name: templateSuccessResult
+    type: expression
+    operation: '{
+      "result": {
+      "outputs":[
+      {
+      "key":"Component in Catalog",
+      "value": $SECRET.rhdh_url + "/catalog/default/component/" + .component.repoName,
+      "format":"link"
+      }]
+      }
+      }'
+  - name: templateErrorResult
+    type: expression
+    operation: '{
+      "result": {
+      "completedWith":"error",
+      "message": "Launching software template " + $SECRET.software_template_ref + " failed.",
+      "outputs":[]
+      }
+      }'
+  - name: successResult
+    type: expression
+    operation: '{
+        "result": {
+          "message": "Namespace " + .namespace + " active",
+          "outputs":[]
+        }
+      }'
+  - name: errorNamespaceNotActiveResult
+    type: expression
+    operation: '{
+        "result": {
+          "message": "Namespace " + .namespace + " not active"
+        }
+      }'
+  - name: errorDeniedResult
+    type: expression
+    operation: '{
+        "result": {
+          "message": "Creation of namespace " + .namespace + " denied",
+          "outputs":[
+            {
+                "key":"Ticket",
+                "value": $SECRET.ticket_manager_url + "/rest/api/v1/ticket/" + .createTicketResult.id,
+                "format":"link"
+            }]
+          }
+      }'
+start: OpenTicket
+states:
+  - name: OpenTicket
+    type: operation
+    actionMode: sequential
+    actions:
+      - name: 'Create Ticket'
+        functionRef:
+          refName: createTicket
+          arguments:
+            type: 'Task'
+            labels:
+              - rhdh-workflow
+              - '"workflowId=" + $WORKFLOW.instanceId'
+            project: 'rhdh-operations'
+            summary: '"Request authorization to create namespace " + .namespace'
+        actionDataFilter:
+          toStateData: .createTicketResult
+    transition: SendNotificationTicketCreated
+  - name: SendNotificationTicketCreated
+    type: operation
+    actions:
+      - name: "Create notification: ticket created"
+        functionRef:
+          refName: createNotification
+          arguments:
+            recipients:
+              type: "entity"
+              entityRef: .recipients
+            payload:
+              title: "Ticket created"
+              description: "Ticket created"
+              topic: "Create OCP Namespace workflow"
+              link: '$SECRET.ticket_manager_url + "/rest/api/v1/ticket/" + .createTicketResult.id'
+              severity: "normal"
+    transition: PollTicket
+  - name: PollTicket
+    type: operation
+    actions:
+      - name: 'get ticket'
+        actionDataFilter:
+          toStateData: .getTicketResult
+        functionRef:
+          refName: getTicket
+          arguments:
+            ticketId: .createTicketResult.id
+        sleep:
+          before: PT60S
+    transition: CheckTicketStatus
+  - name: CheckTicketStatus
+    type: switch
+    dataConditions:
+      - name: Resource request denied
+        condition: .getTicketResult.status == "Denied"
+        transition: CloseTicketDenied
+      - name: Resource request authorized
+        condition: .getTicketResult.status == "Approved"
+        transition: LaunchSoftwareTemplate
+    defaultCondition:
+      transition: PollTicket
+  - name: LaunchSoftwareTemplate
+    type: operation
+    actions:
+      - name: 'Launch Software Template'
+        functionRef:
+          refName: launchSoftwareTemplate
+          arguments:
+            templateRef: $SECRET.software_template_ref
+            values:
+              component_id: .namespace
+              namespace_owner: .requester
+        actionDataFilter:
+          toStateData: .launchedTemplate
+    transition: GetSoftwareTemplate
+  - name: GetSoftwareTemplate
+    type: operation
+    actions:
+      - functionRef:
+          refName: logInfo
+          arguments:
+            message: '"Sleeping before checking the software template "'
+        sleep:
+          after: PT15S
+      - functionRef:
+          refName: getSoftwareTemplateTask
+          arguments:
+            taskId: .launchedTemplate.id
+        actionDataFilter:
+          toStateData: .readTask
+    transition: IsTaskDone
+  - name: IsTaskDone
+    type: switch
+    dataConditions:
+      - condition: (.readTask.status == "processing")
+        transition:
+          nextState: GetSoftwareTemplate
+      - condition: (.readTask.status == "completed")
+        transition:
+          nextState: SendTaskCompletedNotification
+      - condition: (.readTask.status == "failed")
+        transition:
+          nextState: SendTaskFailureNotification
+    defaultCondition:
+      transition: GetSoftwareTemplate
+  - name: SendTaskCompletedNotification
+    type: operation
+    actions:
+      - functionRef:
+          refName: templateSuccessResult
+      - functionRef:
+          refName: createNotification
+          arguments:
+            recipients:
+              type: "entity"
+              entityRef: .recipients
+            payload:
+              title: '"Namespace " + .namespace + " created"'
+              description: '"Namespace " + .namespace + " created"'
+              topic: "Create OCP Namespace workflow"
+              link: '$SECRET.rhdh_url + "/catalog/default/component/" + .namespace'
+              severity: "normal"
+    transition: CloseTicket
+  - name: SendTaskFailureNotification
+    type: operation
+    actions:
+      - name: templateErrorResult
+        functionRef:
+          refName: templateErrorResult
+      - functionRef:
+          refName: createNotification
+          arguments:
+            recipients:
+              type: "entity"
+              entityRef: .recipients
+            payload:
+              title: '"Namespace " + ..namespace + " could not be created"'
+              description: '"Namespace " + .namespace + " could not be created"'
+              topic: "Create OCP Namespace workflow"
+              severity: "high"
+    transition: CloseTicket 
+  - name: CloseTicket
+    type: operation
+    actionMode: sequential
+    actions:
+      - name: Close ticket
+        actionDataFilter:
+          toStateData: .closeTicketResult
+        functionRef:
+          refName: closeTicket
+          arguments:
+            ticketId: .createTicketResult.id
+            status: "Closed"
+    end: true
+  - name: CloseTicketDenied
+    type: operation
+    actionMode: sequential
+    metadata:
+      errorMessage: '"Creation of namespace " + .namespace + " denied"'
+    actions:
+      - name: setOutput
+        functionRef:
+          refName: errorDeniedResult
+      - name: Close ticket
+        actionDataFilter:
+          toStateData: .closeTicketResult
+        functionRef:
+          refName: closeTicket
+          arguments:
+            ticketId: .createTicketResult.id
+            status: "Closed"
+    end: true
