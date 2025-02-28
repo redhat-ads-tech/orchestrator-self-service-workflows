@@ -2,7 +2,7 @@ id: create-ocp-namespace
 version: '1.0'
 specVersion: '0.8'
 name: 'Create OpenShift Namespace'
-description: 'Creating an OpenShift Namespace'
+description: 'Create an OpenShift Namespace'
 dataInputSchema: schemas/create-ocp-namespace-schema.json
 extensions:
   - extensionid: workflow-output-schema
