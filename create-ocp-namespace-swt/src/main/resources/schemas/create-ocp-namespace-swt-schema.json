@@ -15,6 +15,11 @@
       "type": "string",
       "description": "The requester of the namespace",
       "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+    }, 
+    "reason": {
+      "title": "Reason",
+      "type": "string",
+      "description": "The reason a large namespace is required"
     },    
     "recipients": {
       "title": "Recipients",
@@ -31,6 +36,7 @@
   "required": [
     "namespace",
     "requester",
+    "reason",
     "recipients"
   ]
 }

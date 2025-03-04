@@ -5,12 +5,14 @@ name: 'Create OpenShift Namespace'
 description: 'Creating an OpenShift Namespace'
 dataInputSchema: schemas/create-ocp-namespace-swt-schema.json
 functions:
-  - name: createTicket
-    operation: specs/ticket-manager-openapi.yaml#createTicket
-  - name: getTicket
-    operation: specs/ticket-manager-openapi.yaml#getTicketById
-  - name: closeTicket
-    operation: specs/ticket-manager-openapi.yaml#transitionTicket
+  - name: getProjectId
+    operation: specs/gitlab-openapi.yaml#getApiV4Projects
+  - name: createIssue
+    operation: specs/gitlab-openapi.yaml#postApiV4ProjectsIdIssues
+  - name: getIssue
+    operation: specs/gitlab-openapi.yaml#getApiV4ProjectsIdIssuesIssueId
+  - name: closeIssue
+    operation: specs/gitlab-openapi.yaml#putApiV4ProjectsIdIssuesIssueId
   - name: createNotification
     operation: specs/notifications-openapi.yaml#createNotification
   - name: launchSoftwareTemplate
@@ -63,35 +65,44 @@ functions:
           "message": "Creation of namespace " + .namespace + " denied",
           "outputs":[
             {
-                "key":"Ticket",
-                "value": $SECRET.ticket_manager_url + "/rest/api/v1/ticket/" + .createTicketResult.id,
+                "key":"Issue",
+                "value": .createIssueResult.web_url,
                 "format":"link"
             }]
           }
       }'
-start: OpenTicket
+start: GetGitlabProjectId
 states:
-  - name: OpenTicket
+  - name: GetGitlabProjectId
     type: operation
-    actionMode: sequential
     actions:
-      - name: 'Create Ticket'
+      - name: GetGitlabProjectId
         functionRef:
-          refName: createTicket
-          arguments:
-            type: 'Task'
-            labels:
-              - rhdh-workflow
-              - '"workflowId=" + $WORKFLOW.instanceId'
-            project: 'rhdh-operations'
-            summary: '"Request authorization to create namespace " + .namespace'
+          refName: getProjectId
+          arguments: 
+            search: 'rhdh-issues'
+            simple: true
         actionDataFilter:
-          toStateData: .createTicketResult
-    transition: SendNotificationTicketCreated
-  - name: SendNotificationTicketCreated
+          toStateData: .getProjectIdResult
+    transition: CreateIssue
+    end: false
+  - name: CreateIssue
     type: operation
     actions:
-      - name: "Create notification: ticket created"
+      - name: CreateIssue
+        functionRef: 
+          refName: createIssue
+          arguments:
+            id: .getProjectIdResult[0].id|tostring
+            title: '"Request for large namespace " + .namespace + " for user " + .requester'
+            description: '.reason'
+        actionDataFilter:
+          toStateData: .createIssueResult
+    transition: SendNotificationIssueCreated
+  - name: SendNotificationIssueCreated
+    type: operation
+    actions:
+      - name: "Create notification: issue created"
         functionRef:
           refName: createNotification
           arguments:
@@ -99,36 +110,37 @@ states:
               type: "entity"
               entityRef: .recipients
             payload:
-              title: "Ticket created"
-              description: "Ticket created"
+              title: '"Issue created: Request for large namespace " + .namespace+ " for user " + .requester'
+              description: '"Issue created: Request for large namespace " + .namespace+ " for user " + .requester'
               topic: "Create OCP Namespace workflow"
-              link: '$SECRET.ticket_manager_url + "/rest/api/v1/ticket/" + .createTicketResult.id'
+              link: .createIssueResult.web_url
               severity: "normal"
-    transition: PollTicket
-  - name: PollTicket
+    transition: PollIssue
+  - name: PollIssue
     type: operation
     actions:
-      - name: 'get ticket'
-        actionDataFilter:
-          toStateData: .getTicketResult
+      - name: 'GetIssue'
         functionRef:
-          refName: getTicket
+          refName: getIssue
           arguments:
-            ticketId: .createTicketResult.id
+            id: .getProjectIdResult[0].id|tostring
+            issue_iid: .createIssueResult.iid
+        actionDataFilter:
+          toStateData: .getIssueResult
         sleep:
           before: PT60S
-    transition: CheckTicketStatus
-  - name: CheckTicketStatus
+    transition: CheckIssueStatus
+  - name: CheckIssueStatus
     type: switch
     dataConditions:
       - name: Resource request denied
-        condition: .getTicketResult.status == "Denied"
-        transition: CloseTicketDenied
+        condition: (.getIssueResult.labels|length > 0) and (.getIssueResult.labels[0] == "denied")
+        transition: SendNotificationRequestDenied
       - name: Resource request authorized
-        condition: .getTicketResult.status == "Approved"
+        condition: (.getIssueResult.labels|length > 0) and (.getIssueResult.labels[0] == "approved")
         transition: LaunchSoftwareTemplate
     defaultCondition:
-      transition: PollTicket
+      transition: PollIssue
   - name: LaunchSoftwareTemplate
     type: operation
     actions:
@@ -190,7 +202,7 @@ states:
               topic: "Create OCP Namespace workflow"
               link: '$SECRET.rhdh_url + "/catalog/default/component/" + .namespace'
               severity: "normal"
-    transition: CloseTicket
+    transition: CloseIssue
   - name: SendTaskFailureNotification
     type: operation
     actions:
@@ -208,21 +220,39 @@ states:
               description: '"Namespace " + .namespace + " could not be created"'
               topic: "Create OCP Namespace workflow"
               severity: "high"
-    transition: CloseTicket 
-  - name: CloseTicket
+    transition: CloseIssue 
+  - name: CloseIssue
     type: operation
     actionMode: sequential
     actions:
-      - name: Close ticket
+      - name: CloseIssue
         actionDataFilter:
-          toStateData: .closeTicketResult
+          toStateData: .closeIssueResult
         functionRef:
-          refName: closeTicket
+          refName: closeIssue
           arguments:
-            ticketId: .createTicketResult.id
-            status: "Closed"
+            id: .getProjectIdResult[0].id|tostring
+            issue_iid: .createIssueResult.iid
+            state_event: "close"
     end: true
-  - name: CloseTicketDenied
+  - name: SendNotificationRequestDenied
+    type: operation
+    actions:
+      - name: "Create notification: request denied"
+        functionRef:
+          refName: createNotification
+          arguments:
+            recipients:
+              type: "entity"
+              entityRef: .recipients
+            payload:
+              title: '"Denied: Request for large namespace " + .namespace+ " for user " + .requester'
+              description: '"Denied: Request for large namespace " + .namespace+ " for user " + .requester'
+              topic: "Create OCP Namespace workflow"
+              link: .createIssueResult.web_url
+              severity: "normal"
+    transition: CloseIssueDenied
+  - name: CloseIssueDenied
     type: operation
     actionMode: sequential
     metadata:
@@ -231,12 +261,13 @@ states:
       - name: setOutput
         functionRef:
           refName: errorDeniedResult
-      - name: Close ticket
+      - name: CloseIssue
         actionDataFilter:
-          toStateData: .closeTicketResult
+          toStateData: .closeIssueResult
         functionRef:
-          refName: closeTicket
+          refName: closeIssue
           arguments:
-            ticketId: .createTicketResult.id
-            status: "Closed"
+            id: .getProjectIdResult[0].id|tostring
+            issue_iid: .createIssueResult.iid
+            state_event: "close"
     end: true
