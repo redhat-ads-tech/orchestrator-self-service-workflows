@@ -1,0 +1,238 @@
+name: Build create-ocp-namespace-swt Workflow and Publish Helm Chart
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'create-ocp-namespace-swt/**'
+      - 'resources/**'
+      - 'scripts/**'
+      - 'charts/create-ocp-namespace-swt/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'create-ocp-namespace-swt/**'
+      - 'resources/**'
+      - 'scripts/**'
+      - 'charts/create-ocp-namespace-swt/**'
+  workflow_dispatch:
+    inputs:
+      update_charts:
+        description: 'Update and publish Helm chart'
+        required: false
+        type: boolean
+        default: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAMESPACE: ${{ github.repository_owner }}
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      charts_changed: ${{ steps.changes.outputs.charts_changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changes
+        id: changes
+        run: |
+          # Check if create-ocp-namespace-swt workflow or related files changed
+          WORKFLOW_CHANGED="false"
+          if git diff --name-only HEAD~1 HEAD | grep -E "^(create-ocp-namespace-swt/|resources/|scripts/)" > /dev/null; then
+            WORKFLOW_CHANGED="true"
+          fi
+          
+          # Check if charts changed
+          CHARTS_CHANGED="false"
+          if git diff --name-only HEAD~1 HEAD | grep -E "^charts/create-ocp-namespace-swt/" > /dev/null; then
+            CHARTS_CHANGED="true"
+          fi
+          
+          # If no specific changes detected, build on main branch
+          if [ "${{ github.ref }}" = "refs/heads/main" ] && [ "$WORKFLOW_CHANGED" = "false" ]; then
+            CHARTS_CHANGED="true"
+          fi
+          
+          echo "charts_changed=$CHARTS_CHANGED" >> $GITHUB_OUTPUT
+          echo "Charts changed: $CHARTS_CHANGED"
+
+  build-workflow:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.metadata.outputs.image_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Podman
+        uses: containers/podman-setup-action@v1
+        with:
+          podman-version: latest
+
+      - name: Install kn CLI
+        run: |
+          curl -L https://github.com/knative/client/releases/download/knative-v1.19.4/kn-linux-amd64 -o kn
+          chmod +x kn
+          sudo mv kn /usr/local/bin/
+
+      - name: Install kn-workflow plugin
+        run: |
+          curl -L https://dlcdn.apache.org/incubator/kie/10.1.0/apache-kie-10.1.0-incubating-sonataflow-knative-plugin-linux-x86.zip -o kn-workflow.zip
+          unzip kn-workflow.zip
+          chmod +x kn-workflow-linux-amd64
+          sudo mv kn-workflow-linux-amd64 /usr/local/bin/kn-workflow
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract workflow metadata
+        id: metadata
+        run: |
+          WORKFLOW_DIR="create-ocp-namespace-swt"
+          ARGFILE="$WORKFLOW_DIR/src/main/resources/argfile.conf"
+          
+          if [ -f "$ARGFILE" ]; then
+            FLOW_NAME=$(grep "^FLOW_NAME=" "$ARGFILE" | cut -d'=' -f2- | tr -d '"')
+            FLOW_SUMMARY=$(grep "^FLOW_SUMMARY=" "$ARGFILE" | cut -d'=' -f2- | tr -d '"')
+            FLOW_DESCRIPTION=$(grep "^FLOW_DESCRIPTION=" "$ARGFILE" | cut -d'=' -f2- | tr -d '"')
+          else
+            FLOW_NAME="create-ocp-namespace-swt Serverless Workflow"
+            FLOW_SUMMARY="create-ocp-namespace-swt Serverless Workflow"
+            FLOW_DESCRIPTION="Serverless workflow for create-ocp-namespace-swt"
+          fi
+          
+          echo "flow_name=$FLOW_NAME" >> $GITHUB_OUTPUT
+          echo "flow_summary=$FLOW_SUMMARY" >> $GITHUB_OUTPUT
+          echo "flow_description=$FLOW_DESCRIPTION" >> $GITHUB_OUTPUT
+          
+          # Set image tag
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            IMAGE_TAG="latest"
+          else
+            IMAGE_TAG="${{ github.sha }}"
+          fi
+          
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "image_name=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/create-ocp-namespace-swt" >> $GITHUB_OUTPUT
+
+      - name: Build and push workflow image
+        run: |
+          export WORKFLOW_ID="create-ocp-namespace-swt"
+          export WORKFLOW_FOLDER="create-ocp-namespace-swt"
+          export WORKFLOW_IMAGE_REGISTRY="${{ env.REGISTRY }}"
+          export WORKFLOW_IMAGE_NAMESPACE="${{ env.IMAGE_NAMESPACE }}"
+          export WORKFLOW_IMAGE_TAG="${{ steps.metadata.outputs.image_tag }}"
+          export FLOW_NAME="${{ steps.metadata.outputs.flow_name }}"
+          export FLOW_SUMMARY="${{ steps.metadata.outputs.flow_summary }}"
+          export FLOW_DESCRIPTION="${{ steps.metadata.outputs.flow_description }}"
+          
+          chmod +x scripts/build-push.sh
+          ./scripts/build-push.sh
+
+      - name: Generate workflow manifests
+        run: |
+          export WORKFLOW_ID="create-ocp-namespace-swt"
+          export WORKFLOW_FOLDER="create-ocp-namespace-swt"
+          export WORKFLOW_IMAGE_REGISTRY="${{ env.REGISTRY }}"
+          export WORKFLOW_IMAGE_NAMESPACE="${{ env.IMAGE_NAMESPACE }}"
+          export WORKFLOW_IMAGE_TAG="${{ steps.metadata.outputs.image_tag }}"
+          export ENABLE_PERSISTENCE=true
+          
+          chmod +x scripts/gen-manifest.sh
+          ./scripts/gen-manifest.sh
+
+      - name: Upload workflow manifests
+        uses: actions/upload-artifact@v4
+        with:
+          name: manifests-create-ocp-namespace-swt-${{ steps.metadata.outputs.image_tag }}
+          path: create-ocp-namespace-swt/src/main/resources/manifests/
+          retention-days: 30
+
+  update-helm-charts:
+    needs: [detect-changes, build-workflow]
+    if: needs.detect-changes.outputs.charts_changed == 'true' || github.event.inputs.update_charts == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: '3.12.0'
+
+      - name: Download workflow manifests
+        uses: actions/download-artifact@v4
+        with:
+          path: ./downloaded-manifests
+
+      - name: Update Helm chart with generated manifests
+        run: |
+          WORKFLOW="create-ocp-namespace-swt"
+          echo "Updating Helm chart for workflow: $WORKFLOW"
+          
+          # Find the manifest directory for this workflow
+          MANIFEST_DIR=$(find ./downloaded-manifests -name "manifests-$WORKFLOW-*" -type d | head -n 1)
+          
+          if [ -d "$MANIFEST_DIR" ]; then
+            # Copy manifests to chart templates directory
+            CHART_DIR="charts/$WORKFLOW"
+            if [ -d "$CHART_DIR" ]; then
+              echo "Copying manifests to $CHART_DIR/templates/"
+              mkdir -p "$CHART_DIR/templates"
+              cp "$MANIFEST_DIR"/*.yaml "$CHART_DIR/templates/"
+              
+              # Update Chart.yaml version
+              CHART_VERSION=$(date +%Y%m%d%H%M%S)
+              yq eval ".version = \"$CHART_VERSION\"" -i "$CHART_DIR/Chart.yaml"
+              
+              # Update values.yaml with new image reference
+              IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/$WORKFLOW"
+              yq eval ".image.repository = \"$IMAGE_NAME\"" -i "$CHART_DIR/values.yaml"
+              
+              # Extract image tag from manifest directory name
+              IMAGE_TAG=$(echo "$MANIFEST_DIR" | sed 's|.*-||')
+              yq eval ".image.tag = \"$IMAGE_TAG\"" -i "$CHART_DIR/values.yaml"
+              
+              echo "Updated chart for $WORKFLOW with image $IMAGE_NAME:$IMAGE_TAG"
+            else
+              echo "Warning: Chart directory $CHART_DIR not found for workflow $WORKFLOW"
+            fi
+          else
+            echo "Warning: No manifest directory found for workflow $WORKFLOW"
+          fi
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Run chart-releaser
+        uses: helm/chart-releaser-action@v1.6.0
+        env:
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          CR_SKIP_EXISTING: false
+
+      - name: Commit and push chart updates
+        if: github.ref == 'refs/heads/main'
+        run: |
+          # Check if there are changes to commit
+          if git diff --quiet; then
+            echo "No changes to commit"
+          else
+            git add charts/
+            git commit -m "Update Helm charts with latest workflow manifests [skip ci]"
+            git push
+          fi

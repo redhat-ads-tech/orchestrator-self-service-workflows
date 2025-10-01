@@ -16,6 +16,16 @@
       "description": "The requester of the namespace",
       "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
     }, 
+    "size": {
+      "title": "Size",
+      "type": "string",
+      "description": "The size of the namespace (small, medium, large). A large namespace requires approval.",
+      "enum": [
+        "small",
+        "medium",
+        "large"
+      ]
+    },
     "reason": {
       "title": "Reason",
       "type": "string",
@@ -36,6 +46,7 @@
   "required": [
     "namespace",
     "requester",
+    "size",
     "reason",
     "recipients"
   ]

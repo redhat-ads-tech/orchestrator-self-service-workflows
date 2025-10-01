@@ -44,12 +44,9 @@ ENABLE_PERSISTENCE="${ENABLE_PERSISTENCE:-true}"
 # image quay.io/orchestrator/ubi9-pipeline from setup/Dockerfile, which we use
 # to exeute this script. See the Makefile gen-manifests target.
 
-WORKDIR=$(mktemp -d)
-echo "Workdir: ${WORKDIR}"
-
-cp -r . ${WORKDIR}
-
-cd "${WORKDIR}"
+# Work directly in the project directory instead of temp directory
+WORKDIR=$(pwd)
+echo "Working in: ${WORKDIR}"
 
 
 command -v kn-workflow
@@ -59,7 +56,9 @@ cd "${WORKFLOW_FOLDER}"/src/main/resources
 
 echo -e "\nquarkus.flyway.migrate-at-start=true" >> application.properties
 
-kn-workflow gen-manifest 
+MANIFEST_DIR="${WORKDIR}/${WORKFLOW_FOLDER}/src/main/resources/manifests"
+mkdir -p "${MANIFEST_DIR}"
+kn-workflow gen-manifest --custom-generated-manifests-dir="${MANIFEST_DIR}" 
 
 # Enable bash's extended blobing for better pattern matching
 shopt -s extglob
@@ -120,4 +119,4 @@ if [ "${ENABLE_PERSISTENCE}" = true ]; then
     )" "${SONATAFLOW_CR}"
 fi
 
-echo "Manifests generated in ${WORKDIR}/${WORKFLOW_FOLDER}/src/main/resources/manifests"
+echo "Manifests generated in ${MANIFEST_DIR}"

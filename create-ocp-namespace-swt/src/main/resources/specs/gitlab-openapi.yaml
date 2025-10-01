@@ -21,10 +21,10 @@ paths:
       parameters:
         - name: order_by
           in: query
-          description:
-            "Return projects ordered by field. storage_size, repository_size,\
-            \ wiki_size, packages_size are only available to admins. Similarity is available\
-            \ when searching and is limited to projects the user has access to."
+          description: Return projects ordered by field. storage_size, repository_size,
+            wiki_size, packages_size are only available to admins. Similarity is
+            available when searching and is limited to projects the user has
+            access to.
           schema:
             type: string
             default: created_at
@@ -130,9 +130,7 @@ paths:
               - 50
         - name: id_after
           in: query
-          description:
-            Limit results to projects with IDs greater than the specified
-            ID
+          description: Limit results to projects with IDs greater than the specified ID
           schema:
             type: integer
             format: int32
@@ -144,17 +142,15 @@ paths:
             format: int32
         - name: last_activity_after
           in: query
-          description:
-            "Limit results to projects with last_activity after specified\
-            \ time. Format: ISO 8601 YYYY-MM-DDTHH:MM:SSZ"
+          description: "Limit results to projects with last_activity after specified time.
+            Format: ISO 8601 YYYY-MM-DDTHH:MM:SSZ"
           schema:
             type: string
             format: date-time
         - name: last_activity_before
           in: query
-          description:
-            "Limit results to projects with last_activity before specified\
-            \ time. Format: ISO 8601 YYYY-MM-DDTHH:MM:SSZ"
+          description: "Limit results to projects with last_activity before specified
+            time. Format: ISO 8601 YYYY-MM-DDTHH:MM:SSZ"
           schema:
             type: string
             format: date-time
@@ -165,8 +161,7 @@ paths:
             type: string
         - name: topic
           in: query
-          description:
-            Comma-separated list of topics. Limit results to projects having
+          description: Comma-separated list of topics. Limit results to projects having
             all topics
           style: form
           explode: false
@@ -176,33 +171,28 @@ paths:
               type: string
         - name: topic_id
           in: query
-          description:
-            Limit results to projects with the assigned topic given by the
+          description: Limit results to projects with the assigned topic given by the
             topic ID
           schema:
             type: integer
             format: int32
         - name: updated_before
           in: query
-          description:
-            "Return projects updated before the specified datetime. Format:\
-            \ ISO 8601 YYYY-MM-DDTHH:MM:SSZ"
+          description: "Return projects updated before the specified datetime. Format: ISO
+            8601 YYYY-MM-DDTHH:MM:SSZ"
           schema:
             type: string
             format: date-time
         - name: updated_after
           in: query
-          description:
-            "Return projects updated after the specified datetime. Format:\
-            \ ISO 8601 YYYY-MM-DDTHH:MM:SSZ"
+          description: "Return projects updated after the specified datetime. Format: ISO
+            8601 YYYY-MM-DDTHH:MM:SSZ"
           schema:
             type: string
             format: date-time
         - name: include_pending_delete
           in: query
-          description:
-            Include projects in pending delete state. Can only be set by
-            admins
+          description: Include projects in pending delete state. Can only be set by admins
           schema:
             type: boolean
         - name: wiki_checksum_failed
@@ -245,7 +235,7 @@ paths:
             default: 20
         - name: simple
           in: query
-          description: "Return only the ID, URL, name, and path of each project"
+          description: Return only the ID, URL, name, and path of each project
           schema:
             type: boolean
             default: false
@@ -273,7 +263,7 @@ paths:
         "400":
           description: Bad request
           content: {}
-  /api/v4/projects/{id}/issues/{issue_iid}:
+  "/api/v4/projects/{id}/issues/{issue_iid}":
     get:
       tags:
         - issues
@@ -282,8 +272,8 @@ paths:
       parameters:
         - name: id
           in: path
-          description:
-            The ID or URL-encoded path of the project owned by the authenticated user
+          description: The ID or URL-encoded path of the project owned by the
+            authenticated user
           required: true
           schema:
             type: string
@@ -312,8 +302,8 @@ paths:
       parameters:
         - name: id
           in: path
-          description:
-            The ID or URL-encoded path of the project owned by the authenticated user
+          description: The ID or URL-encoded path of the project owned by the
+            authenticated user
           required: true
           schema:
             type: string
@@ -334,8 +324,8 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/API_Entities_Issue"               
-  /api/v4/projects/{id}/issues:
+                $ref: "#/components/schemas/API_Entities_Issue"
+  "/api/v4/projects/{id}/issues":
     post:
       tags:
         - issues
@@ -344,9 +334,8 @@ paths:
       parameters:
         - name: id
           in: path
-          description:
-            The ID or URL-encoded path of the project owned by the authenticated
-            user
+          description: The ID or URL-encoded path of the project owned by the
+            authenticated user
           required: true
           schema:
             type: string
@@ -554,9 +543,7 @@ components:
           $ref: "#/components/schemas/API_Entities_UserBasic"
         type:
           type: string
-          description:
-            "One of [\"ISSUE\", \"INCIDENT\", \"TEST_CASE\", \"REQUIREMENT\"\
-            , \"TASK\", \"TICKET\"]"
+          description: One of [ISSUE, INCIDENT, TEST_CASE, REQUIREMENT, TASK, TICKET]
           example: ISSUE
         assignee:
           $ref: "#/components/schemas/API_Entities_UserBasic"
@@ -607,9 +594,7 @@ components:
           $ref: "#/components/schemas/API_Entities_IssuableReferences"
         severity:
           type: string
-          description:
-            "One of [\"UNKNOWN\", \"LOW\", \"MEDIUM\", \"HIGH\", \"CRITICAL\"\
-            ]"
+          description: One of [UNKNOWN, LOW, MEDIUM, HIGH, CRITICAL]
         subscribed:
           type: string
         moved_to_id:
@@ -722,9 +707,8 @@ components:
           format: int32
         assignee_ids:
           type: array
-          description:
-            "The IDs of the users to assign theissue to, as a comma-separated\
-            \ list. Set to 0 or provide an empty value to unassign all assignees."
+          description: The IDs of the users to assign theissue to, as a comma-separated
+            list. Set to 0 or provide an empty value to unassign all assignees.
           items:
             type: integer
             format: int32
@@ -755,21 +739,17 @@ components:
         title:
           type: string
     API_Entities_TaskCompletionStatus:
-        type: object
-        properties:
-          count:
-            type: integer
-            format: int32
-          completed_count:
-            type: integer
-            format: int32
+      type: object
+      properties:
+        count:
+          type: integer
+          format: int32
+        completed_count:
+          type: integer
+          format: int32
   securitySchemes:
     access_token_header:
       type: apiKey
       name: PRIVATE-TOKEN
       in: header
-    # access_token_query:
-    #   type: apiKey
-    #   name: private_token
-    #   in: query
 x-original-swagger-version: "2.0"
