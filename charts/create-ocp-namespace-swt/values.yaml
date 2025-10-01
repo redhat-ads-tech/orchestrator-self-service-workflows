@@ -9,11 +9,9 @@ persistence:
       port: 5432
       databaseName: backstage_plugin_orchestrator
       databaseSchema: create-ocp-namespace-swt
-
-image: 
-  repository: quay.io/evanshortiss/swf-create-ocp-namespace-swt
+image:
+  repository: ghcr.io/evanshortiss/create-ocp-namespace-swt
   tag: latest
-
 # Environment variables for the workflow
 env:
   backstageBackendUrl: ""
@@ -21,6 +19,5 @@ env:
   gitlabUrl: ""
   gitlabToken: ""
   swtRef: "template:default/orchestrator-namespace-request"
-
 backstage:
   softwareTemplateNamespace:
