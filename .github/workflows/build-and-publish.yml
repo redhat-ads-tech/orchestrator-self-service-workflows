@@ -121,28 +121,21 @@ jobs:
         id: metadata
         run: |
           WORKFLOW_DIR="create-ocp-namespace-swt"
-          ARGFILE="$WORKFLOW_DIR/src/main/resources/argfile.conf"
           
-          if [ -f "$ARGFILE" ]; then
-            FLOW_NAME=$(grep "^FLOW_NAME=" "$ARGFILE" | cut -d'=' -f2- | tr -d '"')
-            FLOW_SUMMARY=$(grep "^FLOW_SUMMARY=" "$ARGFILE" | cut -d'=' -f2- | tr -d '"')
-            FLOW_DESCRIPTION=$(grep "^FLOW_DESCRIPTION=" "$ARGFILE" | cut -d'=' -f2- | tr -d '"')
-          else
-            FLOW_NAME="create-ocp-namespace-swt Serverless Workflow"
-            FLOW_SUMMARY="create-ocp-namespace-swt Serverless Workflow"
-            FLOW_DESCRIPTION="Serverless workflow for create-ocp-namespace-swt"
-          fi
+          # Extract version from pom.xml
+          PROJECT_VERSION=$(grep -A1 '<artifactId>create-ocp-namespace-swt</artifactId>' "$WORKFLOW_DIR/pom.xml" | grep '<version>' | sed 's/.*<version>\(.*\)<\/version>.*/\1/')
+          
+          # Hardcoded flow metadata
+          FLOW_NAME="create-ocp-namespace-swt Serverless Workflow"
+          FLOW_SUMMARY="create-ocp-namespace-swt Serverless Workflow"
+          FLOW_DESCRIPTION="create-ocp-namespace-swt workflow creates a namespace on behalf of an OpenShift user, using a software template"
           
           echo "flow_name=$FLOW_NAME" >> $GITHUB_OUTPUT
           echo "flow_summary=$FLOW_SUMMARY" >> $GITHUB_OUTPUT
           echo "flow_description=$FLOW_DESCRIPTION" >> $GITHUB_OUTPUT
           
-          # Set image tag
-          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            IMAGE_TAG="latest"
-          else
-            IMAGE_TAG="${{ github.sha }}"
-          fi
+          # Use project version for image tag
+          IMAGE_TAG="$PROJECT_VERSION"
           
           echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
           echo "image_name=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/create-ocp-namespace-swt" >> $GITHUB_OUTPUT
@@ -225,7 +218,7 @@ jobs:
               # Use the image tag from the build workflow
               IMAGE_TAG="${{ needs.build-workflow.outputs.image_tag }}"
               
-              # Update Chart.yaml version using image tag
+              # Update Chart.yaml version using project version
               CHART_VERSION="$IMAGE_TAG"
               yq eval ".version = \"$CHART_VERSION\"" -i "$CHART_DIR/Chart.yaml"
               
