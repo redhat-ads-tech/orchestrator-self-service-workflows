@@ -17,6 +17,11 @@ on:
       - 'charts/create-ocp-namespace-swt/**'
   workflow_dispatch:
     inputs:
+      build_container:
+        description: 'Build and push container image'
+        required: false
+        type: boolean
+        default: true
       update_charts:
         description: 'Update and publish Helm chart'
         required: false
@@ -31,6 +36,7 @@ jobs:
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
+      workflow_changed: ${{ steps.changes.outputs.workflow_changed }}
       charts_changed: ${{ steps.changes.outputs.charts_changed }}
     steps:
       - name: Checkout
@@ -53,16 +59,27 @@ jobs:
             CHARTS_CHANGED="true"
           fi
           
+          # Handle manual dispatch
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ "${{ github.event.inputs.build_container }}" = "true" ]; then
+              WORKFLOW_CHANGED="true"
+            fi
+            if [ "${{ github.event.inputs.update_charts }}" = "true" ]; then
+              CHARTS_CHANGED="true"
+            fi
           # If no specific changes detected, build on main branch
-          if [ "${{ github.ref }}" = "refs/heads/main" ] && [ "$WORKFLOW_CHANGED" = "false" ]; then
+          elif [ "${{ github.ref }}" = "refs/heads/main" ] && [ "$WORKFLOW_CHANGED" = "false" ]; then
             CHARTS_CHANGED="true"
           fi
           
+          echo "workflow_changed=$WORKFLOW_CHANGED" >> $GITHUB_OUTPUT
           echo "charts_changed=$CHARTS_CHANGED" >> $GITHUB_OUTPUT
+          echo "Workflow changed: $WORKFLOW_CHANGED"
           echo "Charts changed: $CHARTS_CHANGED"
 
   build-workflow:
     needs: detect-changes
+    if: needs.detect-changes.outputs.workflow_changed == 'true'
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.metadata.outputs.image_tag }}
