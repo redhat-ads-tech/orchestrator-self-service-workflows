@@ -175,7 +175,7 @@ jobs:
 
   update-helm-charts:
     needs: [detect-changes, build-workflow]
-    if: needs.detect-changes.outputs.charts_changed == 'true' || github.event.inputs.update_charts == 'true'
+    if: needs.build-workflow.result == 'success' || github.event.inputs.update_charts == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
