@@ -1,6 +1,6 @@
 {{- $sonataflowFile := .Files.Get "manifests/05-sonataflow_create-ocp-namespace-swt.yaml.template" -}}
 {{- $sonataflow := $sonataflowFile | fromYaml -}}
-{{- $_ := set $sonataflow "metadata" (merge $sonataflow.metadata (dict "name" (include "create-ocp-namespace-swt.fullname" .) "labels" (include "create-ocp-namespace-swt.labels" .))) -}}
+{{- $_ := set $sonataflow.metadata "name" (include "create-ocp-namespace-swt.fullname" .) -}}
 {{- $_ := set $sonataflow.spec.podTemplate.container "image" (printf "%s:%s" .Values.image.repository .Values.image.tag) -}}
 {{- $_ := set $sonataflow.spec.podTemplate.container "envFrom" (list (dict "secretRef" (dict "name" (printf "%s-creds" (include "create-ocp-namespace-swt.fullname" .))))) -}}
 {{- if .Values.persistence.postgresql -}}
