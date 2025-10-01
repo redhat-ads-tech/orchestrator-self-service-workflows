@@ -1,44 +1,24 @@
 #!/bin/bash
-program_name=$0
 
-function usage {
-    echo -e "Usage: WORKFLOW_ID=WORKFLOW_ID WORKFLOW_FOLDER=WORKFLOW_FOLDER $program_name"
-    echo "  WORKFLOW_ID                   ID of the workflow to build and push"
-    echo "  WORKFLOW_FOLDER               Path of the directory containing the workflow's files"
-    echo "  WORKFLOW_IMAGE_REGISTRY       Registry name to which the image will be pushed. I.E: quay.io"
-    echo "  WORKFLOW_IMAGE_NAMESPACE      Name of the registry's namespace in which store the image. I.E: orchestrator"
-    exit 1
-}
+# Hardcoded values for create-ocp-namespace-swt workflow
+WORKFLOW_ID="create-ocp-namespace-swt"
+WORKFLOW_FOLDER="create-ocp-namespace-swt"
 
-if [[ -z "${WORKFLOW_ID}" ]]; then
-  echo 'Error: WORKFLOW_ID env variable must be set with the ID of the workflow to build and push; e.g: create-ocp-project'
-  usage
-fi
-
-if [[ -z "${WORKFLOW_FOLDER}" ]]; then
-  echo "Error: WORKFLOW_FOLDER env variable must be set to the path of the directory containing the workflow's files; e.g: 02_advanced"
-  usage
-fi
-
+# Validate required environment variables
 if [[ -z "${WORKFLOW_IMAGE_REGISTRY}" ]]; then
-  echo 'Error: WORKFLOW_IMAGE_REGISTRY env variable must be set with the image registry name; e.g: quay.io'
-  usage
+  echo 'Error: WORKFLOW_IMAGE_REGISTRY env variable must be set with the image registry name; e.g: ghcr.io'
+  exit 1
 fi
 
 if [[ -z "${WORKFLOW_IMAGE_NAMESPACE}" ]]; then
-  echo "Error: WORKFLOW_IMAGE_NAMESPACE env variable must be set with the name of the namespace's registry in which store the image; e.g: orchestrator"
-  usage
+  echo "Error: WORKFLOW_IMAGE_NAMESPACE env variable must be set with the name of the namespace's registry in which store the image; e.g: username"
+  exit 1
 fi
 
-WORKDIR=$(mktemp -d)
-echo "Workdir: ${WORKDIR}"
-
-cp -r . ${WORKDIR}
-
-cd "${WORKDIR}"
-
-rm -rf **/target
-mv ${WORKFLOW_FOLDER}/src/main/resources ${WORKFLOW_FOLDER}/.
+if [[ -z "${WORKFLOW_IMAGE_TAG}" ]]; then
+  echo "Error: WORKFLOW_IMAGE_TAG env variable must be set with the image tag"
+  exit 1
+fi
 
 IMAGE_NAME=${WORKFLOW_IMAGE_REGISTRY}/${WORKFLOW_IMAGE_NAMESPACE}/${WORKFLOW_ID}
 IMAGE_TAG=${WORKFLOW_IMAGE_TAG}

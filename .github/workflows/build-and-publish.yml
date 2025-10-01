@@ -143,8 +143,6 @@ jobs:
 
       - name: Build and push workflow image
         run: |
-          export WORKFLOW_ID="create-ocp-namespace-swt"
-          export WORKFLOW_FOLDER="create-ocp-namespace-swt"
           export WORKFLOW_IMAGE_REGISTRY="${{ env.REGISTRY }}"
           export WORKFLOW_IMAGE_NAMESPACE="${{ env.IMAGE_NAMESPACE }}"
           export WORKFLOW_IMAGE_TAG="${{ steps.metadata.outputs.image_tag }}"
@@ -157,8 +155,6 @@ jobs:
 
       - name: Generate workflow manifests
         run: |
-          export WORKFLOW_ID="create-ocp-namespace-swt"
-          export WORKFLOW_FOLDER="create-ocp-namespace-swt"
           export WORKFLOW_IMAGE_REGISTRY="${{ env.REGISTRY }}"
           export WORKFLOW_IMAGE_NAMESPACE="${{ env.IMAGE_NAMESPACE }}"
           export WORKFLOW_IMAGE_TAG="${{ steps.metadata.outputs.image_tag }}"
@@ -203,12 +199,25 @@ jobs:
           MANIFEST_DIR=$(find ./downloaded-manifests -name "manifests-$WORKFLOW-*" -type d | head -n 1)
           
           if [ -d "$MANIFEST_DIR" ]; then
-            # Copy manifests to chart templates directory
+            # Copy manifests to chart templates directory (excluding SonataFlow CR and secrets)
             CHART_DIR="charts/$WORKFLOW"
             if [ -d "$CHART_DIR" ]; then
               echo "Copying manifests to $CHART_DIR/templates/"
               mkdir -p "$CHART_DIR/templates"
-              cp "$MANIFEST_DIR"/*.yaml "$CHART_DIR/templates/"
+              
+            # Create manifests subdirectory for Helm template access
+            mkdir -p "$CHART_DIR/templates/manifests"
+            
+            # Copy only the SonataFlow CR to manifests subdirectory for Helm template access
+            # Rename to .yaml.template so Helm ignores it but template can still read it
+            cp "$MANIFEST_DIR"/*-sonataflow_*.yaml "$CHART_DIR/templates/manifests/05-sonataflow_create-ocp-namespace-swt.yaml.template" || true
+            
+            # Copy all other manifests to templates root for direct deployment
+            cp "$MANIFEST_DIR"/*.yaml "$CHART_DIR/templates/" || true
+            
+            # Remove SonataFlow CR and secret files from templates root since they're handled by Helm templates
+            rm -f "$CHART_DIR/templates"/*-sonataflow_*.yaml
+            rm -f "$CHART_DIR/templates"/*-secret_*.yaml
               
               # Update Chart.yaml version
               CHART_VERSION=$(date +%Y%m%d%H%M%S)

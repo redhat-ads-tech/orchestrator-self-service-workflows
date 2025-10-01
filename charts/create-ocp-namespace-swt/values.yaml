@@ -14,9 +14,13 @@ image:
   repository: quay.io/evanshortiss/swf-create-ocp-namespace-swt
   tag: latest
 
+# Environment variables for the workflow
+env:
+  backstageBackendUrl: ""
+  backstageBackendBearerToken: ""
+  gitlabUrl: ""
+  gitlabToken: ""
+  swtRef: "template:default/orchestrator-namespace-request"
+
 backstage:
   softwareTemplateNamespace:
-
-secret:
-  backstageToken: orchestrator-backstage-backend-token
-  gitlabToken: orchestrator-gitlab-token

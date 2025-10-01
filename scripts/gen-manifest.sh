@@ -3,42 +3,27 @@
 # always exit if a command fails
 set -o errexit
 
-program_name=$0
+# Hardcoded values for create-ocp-namespace-swt workflow
+WORKFLOW_ID="create-ocp-namespace-swt"
+WORKFLOW_FOLDER="create-ocp-namespace-swt"
 
-function usage {
-    echo -e "Usage: WORKFLOW_ID=WORKFLOW_ID WORKFLOW_FOLDER=WORKFLOW_FOLDER WORKFLOW_IMAGE_REGISTRY=WORKFLOW_IMAGE_REGISTRY WORKFLOW_IMAGE_NAMESPACE=WORKFLOW_IMAGE_NAMESPACE [WORKFLOW_IMAGE_REPO=WORKFLOW_IMAGE_REPO] [WORKFLOW_IMAGE_TAG=WORKFLOW_IMAGE_TAG] [ENABLE_PERSISTENCE=true/false] $program_name"
-    echo "  WORKFLOW_ID                   ID of the workflow to build and push"
-    echo "  WORKFLOW_FOLDER               Path of the directory containing the workflow's files"
-    echo "  WORKFLOW_IMAGE_REGISTRY       Registry name to which the image will be pushed. I.E: quay.io"
-    echo "  WORKFLOW_IMAGE_NAMESPACE      Name of the registry's namespace in which store the image. I.E: orchestrator"
-    echo '  WORKFLOW_IMAGE_REPO           Name of the image, optional, default: demo-${WORKFLOW_ID}'
-    echo "  WORKFLOW_IMAGE_TAG            Tag of the image, optional, default: latest"
-    echo "  ENABLE_PERSISTENCE            Boolean indicating if persistence must be enabled, optional, default: true"
-    exit 1
-}
-
-if [[ -z "${WORKFLOW_ID}" ]]; then
-  echo 'Error: WORKFLOW_ID env variable must be set with the ID of the workflow to build and push; e.g: create-ocp-project'
-  usage
-fi
-
-if [[ -z "${WORKFLOW_FOLDER}" ]]; then
-  echo "Error: WORKFLOW_FOLDER env variable must be set to the path of the directory containing the workflow's files; e.g: 02_advanced"
-  usage
-fi
-
+# Validate required environment variables
 if [[ -z "${WORKFLOW_IMAGE_REGISTRY}" ]]; then
-  echo 'Error: WORKFLOW_IMAGE_REGISTRY env variable must be set with the image registry name; e.g: quay.io'
-  usage
+  echo 'Error: WORKFLOW_IMAGE_REGISTRY env variable must be set with the image registry name; e.g: ghcr.io'
+  exit 1
 fi
 
 if [[ -z "${WORKFLOW_IMAGE_NAMESPACE}" ]]; then
-  echo "Error: WORKFLOW_IMAGE_NAMESPACE env variable must be set with the name of the namespace's registry in which store the image; e.g: orchestrator"
-  usage
+  echo "Error: WORKFLOW_IMAGE_NAMESPACE env variable must be set with the name of the namespace's registry in which store the image; e.g: username"
+  exit 1
+fi
+
+if [[ -z "${WORKFLOW_IMAGE_TAG}" ]]; then
+  echo "Error: WORKFLOW_IMAGE_TAG env variable must be set with the image tag"
+  exit 1
 fi
 
 WORKFLOW_IMAGE_REPO="${WORKFLOW_IMAGE_REPO:-${WORKFLOW_ID}}"
-WORKFLOW_IMAGE_TAG="${WORKFLOW_IMAGE_TAG:-latest}"
 ENABLE_PERSISTENCE="${ENABLE_PERSISTENCE:-true}"
 # helper binaries should be either on the developer machine or in the helper
 # image quay.io/orchestrator/ubi9-pipeline from setup/Dockerfile, which we use
@@ -58,7 +43,7 @@ echo -e "\nquarkus.flyway.migrate-at-start=true" >> application.properties
 
 MANIFEST_DIR="${WORKDIR}/${WORKFLOW_FOLDER}/src/main/resources/manifests"
 mkdir -p "${MANIFEST_DIR}"
-kn-workflow gen-manifest --custom-generated-manifests-dir="${MANIFEST_DIR}" 
+kn-workflow gen-manifest --image "${WORKFLOW_IMAGE_REGISTRY}/${WORKFLOW_IMAGE_NAMESPACE}/${WORKFLOW_IMAGE_REPO}:${WORKFLOW_IMAGE_TAG}" --profile gitops --skip-namespace --custom-generated-manifests-dir="${MANIFEST_DIR}" 
 
 # Enable bash's extended blobing for better pattern matching
 shopt -s extglob
@@ -82,41 +67,10 @@ if [ -z "$workflow_id" ]; then
   exit 1
 fi
 
-find manifests/*.yaml -exec yq --inplace '.metadata.namespace = ""' {} \;
 
+# Note: Secret and SonataFlow CR generation are now handled by Helm chart
+# The SonataFlow CR will be managed by the Helm template
 
-# the main sonataflow file will have a prefix of variable number, 01 or 02 and so on, because manifests created by
-# gen-manifests are now sorted by name. We need to take *-sonataflow-$workflow_id.yaml to resolve that.
-SONATAFLOW_CR=$(printf '%s' manifests/*-sonataflow_"${workflow_id}".yaml)
-yq --inplace eval '.metadata.annotations["sonataflow.org/profile"] = "gitops"' "${SONATAFLOW_CR}"
-
-yq --inplace ".spec.podTemplate.container.image=\"${WORKFLOW_IMAGE_REGISTRY}/${WORKFLOW_IMAGE_NAMESPACE}/${WORKFLOW_IMAGE_REPO}:${WORKFLOW_IMAGE_TAG}\"" "${SONATAFLOW_CR}"
-
-if test -f "secret.properties"; then
-  yq --inplace ".spec.podTemplate.container.envFrom=[{\"secretRef\": { \"name\": \"${workflow_id}-creds\"}}]" "${SONATAFLOW_CR}"
-  kubectl create secret generic "${workflow_id}-creds" --from-env-file=secret.properties --dry-run=client -oyaml > "manifests/00-secret_${workflow_id}.yaml"
-fi
-
-if [ "${ENABLE_PERSISTENCE}" = true ]; then
-    yq --inplace ".spec |= (
-      . + {
-        \"persistence\": {
-          \"postgresql\": {
-            \"secretRef\": {
-              \"name\": \"sonataflow-psql-postgresql\",
-              \"userKey\": \"postgres-username\",
-              \"passwordKey\": \"postgres-password\"
-            },
-            \"serviceRef\": {
-              \"name\": \"sonataflow-psql-postgresql\",
-              \"port\": 5432,
-              \"databaseName\": \"sonataflow\",
-              \"databaseSchema\": \"${WORKFLOW_ID}\"
-            }
-          }
-        }
-      }
-    )" "${SONATAFLOW_CR}"
-fi
+# Note: Persistence configuration is now handled by Helm chart
 
 echo "Manifests generated in ${MANIFEST_DIR}"

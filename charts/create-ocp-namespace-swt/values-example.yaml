@@ -1,0 +1,28 @@
+# Example values file for create-ocp-namespace-swt Helm chart
+# Copy this file and update the values for your environment
+
+# Image configuration
+image:
+  repository: ghcr.io/your-org/create-ocp-namespace-swt
+  tag: latest
+
+# Environment variables - these will be injected as secrets
+env:
+  backstageBackendUrl: "https://your-backstage-instance.com"
+  backstageBackendBearerToken: "your-backstage-token"
+  gitlabUrl: "https://gitlab.your-domain.com"
+  gitlabToken: "your-gitlab-token"
+  swtRef: "template:default/orchestrator-namespace-request"
+
+# Persistence configuration
+persistence:
+  postgresql:
+    secretRef:
+      name: backstage-psql-secret-developer-hub
+      userKey: POSTGRES_USER
+      passwordKey: POSTGRES_PASSWORD
+    serviceRef:
+      name: backstage-psql-developer-hub
+      port: 5432
+      databaseName: backstage_plugin_orchestrator
+      databaseSchema: create-ocp-namespace-swt

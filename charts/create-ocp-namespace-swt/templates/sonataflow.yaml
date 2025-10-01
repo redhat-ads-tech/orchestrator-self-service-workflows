@@ -1,0 +1,16 @@
+{{- $sonataflowFile := .Files.Get "manifests/05-sonataflow_create-ocp-namespace-swt.yaml.template" -}}
+{{- $sonataflow := $sonataflowFile | fromYaml -}}
+{{- $sonataflow = $sonataflow | set "metadata.name" (include "create-ocp-namespace-swt.fullname" .) -}}
+{{- $sonataflow = $sonataflow | set "metadata.labels" (include "create-ocp-namespace-swt.labels" .) -}}
+{{- $sonataflow = $sonataflow | set "spec.podTemplate.container.image" (printf "%s:%s" .Values.image.repository .Values.image.tag) -}}
+{{- $sonataflow = $sonataflow | set "spec.podTemplate.container.envFrom[0].secretRef.name" (printf "%s-creds" (include "create-ocp-namespace-swt.fullname" .)) -}}
+{{- if .Values.persistence.postgresql -}}
+{{- $sonataflow = $sonataflow | set "spec.persistence.postgresql.secretRef.name" .Values.persistence.postgresql.secretRef.name -}}
+{{- $sonataflow = $sonataflow | set "spec.persistence.postgresql.secretRef.userKey" .Values.persistence.postgresql.secretRef.userKey -}}
+{{- $sonataflow = $sonataflow | set "spec.persistence.postgresql.secretRef.passwordKey" .Values.persistence.postgresql.secretRef.passwordKey -}}
+{{- $sonataflow = $sonataflow | set "spec.persistence.postgresql.serviceRef.name" .Values.persistence.postgresql.serviceRef.name -}}
+{{- $sonataflow = $sonataflow | set "spec.persistence.postgresql.serviceRef.port" .Values.persistence.postgresql.serviceRef.port -}}
+{{- $sonataflow = $sonataflow | set "spec.persistence.postgresql.serviceRef.databaseName" .Values.persistence.postgresql.serviceRef.databaseName -}}
+{{- $sonataflow = $sonataflow | set "spec.persistence.postgresql.serviceRef.databaseSchema" .Values.persistence.postgresql.serviceRef.databaseSchema -}}
+{{- end -}}
+{{- $sonataflow | toYaml }}
