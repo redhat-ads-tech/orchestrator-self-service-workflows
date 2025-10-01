@@ -1,0 +1,264 @@
+name: Build Workflow, Push Image, and Publish Helm Chart
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'create-ocp-namespace-swt/**'
+      - 'resources/**'
+      - 'scripts/**'
+      - 'charts/create-ocp-namespace-swt/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'create-ocp-namespace-swt/**'
+      - 'resources/**'
+      - 'scripts/**'
+      - 'charts/create-ocp-namespace-swt/**'
+  workflow_dispatch:
+    inputs:
+      build_container:
+        description: 'Build and push container image'
+        required: false
+        type: boolean
+        default: true
+      update_charts:
+        description: 'Update and publish Helm chart'
+        required: false
+        type: boolean
+        default: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAMESPACE: ${{ github.repository_owner }}
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      workflow_changed: ${{ steps.changes.outputs.workflow_changed }}
+      charts_changed: ${{ steps.changes.outputs.charts_changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changes
+        id: changes
+        run: |
+          # Check if create-ocp-namespace-swt workflow or related files changed
+          WORKFLOW_CHANGED="false"
+          if git diff --name-only HEAD~1 HEAD | grep -E "^(create-ocp-namespace-swt/|resources/|scripts/|create-ocp-namespace-swt/pom.xml)" > /dev/null; then
+            WORKFLOW_CHANGED="true"
+          fi
+          
+          # Check if charts changed
+          CHARTS_CHANGED="false"
+          if git diff --name-only HEAD~1 HEAD | grep -E "^charts/create-ocp-namespace-swt/" > /dev/null; then
+            CHARTS_CHANGED="true"
+          fi
+          
+          # Handle manual dispatch
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ "${{ github.event.inputs.build_container }}" = "true" ]; then
+              WORKFLOW_CHANGED="true"
+              CHARTS_CHANGED="true"  # Charts should always be updated when workflow builds
+            fi
+            if [ "${{ github.event.inputs.update_charts }}" = "true" ]; then
+              CHARTS_CHANGED="true"
+            fi
+          # If no specific changes detected, build on main branch
+          elif [ "${{ github.ref }}" = "refs/heads/main" ] && [ "$WORKFLOW_CHANGED" = "false" ]; then
+            CHARTS_CHANGED="true"
+          fi
+          
+          # Charts should always be updated when workflow changes
+          if [ "$WORKFLOW_CHANGED" = "true" ]; then
+            CHARTS_CHANGED="true"
+          fi
+          
+          echo "workflow_changed=$WORKFLOW_CHANGED" >> $GITHUB_OUTPUT
+          echo "charts_changed=$CHARTS_CHANGED" >> $GITHUB_OUTPUT
+          echo "Workflow changed: $WORKFLOW_CHANGED"
+          echo "Charts changed: $CHARTS_CHANGED"
+
+  build-workflow:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.workflow_changed == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.metadata.outputs.image_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Podman
+        run: |
+          sudo apt-get -y install podman
+
+      - name: Install kn CLI
+        run: |
+          curl -L https://github.com/knative/client/releases/download/knative-v1.19.4/kn-linux-amd64 -o kn
+          chmod +x kn
+          sudo mv kn /usr/local/bin/
+
+      - name: Install kn-workflow plugin
+        run: |
+          curl -L https://dlcdn.apache.org/incubator/kie/10.1.0/apache-kie-10.1.0-incubating-sonataflow-knative-plugin-linux-x86.zip -o kn-workflow.zip
+          unzip kn-workflow.zip
+          chmod +x kn-workflow-linux-amd64
+          sudo mv kn-workflow-linux-amd64 /usr/local/bin/kn-workflow
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract workflow metadata
+        id: metadata
+        run: |
+          WORKFLOW_DIR="create-ocp-namespace-swt"
+          
+          # Extract version from pom.xml
+          PROJECT_VERSION=$(grep -A1 '<artifactId>create-ocp-namespace-swt</artifactId>' "$WORKFLOW_DIR/pom.xml" | grep '<version>' | sed 's/.*<version>\(.*\)<\/version>.*/\1/')
+          
+          # Hardcoded flow metadata
+          FLOW_NAME="create-ocp-namespace-swt Serverless Workflow"
+          FLOW_SUMMARY="create-ocp-namespace-swt Serverless Workflow"
+          FLOW_DESCRIPTION="create-ocp-namespace-swt workflow creates a namespace on behalf of an OpenShift user, using a software template"
+          
+          echo "flow_name=$FLOW_NAME" >> $GITHUB_OUTPUT
+          echo "flow_summary=$FLOW_SUMMARY" >> $GITHUB_OUTPUT
+          echo "flow_description=$FLOW_DESCRIPTION" >> $GITHUB_OUTPUT
+          
+          # Use project version for image tag
+          IMAGE_TAG="$PROJECT_VERSION"
+          
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "image_name=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/create-ocp-namespace-swt" >> $GITHUB_OUTPUT
+
+      - name: Build and push workflow image
+        run: |
+          export WORKFLOW_IMAGE_REGISTRY="${{ env.REGISTRY }}"
+          export WORKFLOW_IMAGE_NAMESPACE="${{ env.IMAGE_NAMESPACE }}"
+          export WORKFLOW_IMAGE_TAG="${{ steps.metadata.outputs.image_tag }}"
+          
+          chmod +x scripts/build-push.sh
+          ./scripts/build-push.sh
+
+      - name: Generate workflow manifests
+        run: |
+          export WORKFLOW_IMAGE_REGISTRY="${{ env.REGISTRY }}"
+          export WORKFLOW_IMAGE_NAMESPACE="${{ env.IMAGE_NAMESPACE }}"
+          export WORKFLOW_IMAGE_TAG="${{ steps.metadata.outputs.image_tag }}"
+          export ENABLE_PERSISTENCE=true
+          
+          chmod +x scripts/gen-manifest.sh
+          ./scripts/gen-manifest.sh
+
+      - name: Upload workflow manifests
+        uses: actions/upload-artifact@v4
+        with:
+          name: manifests-create-ocp-namespace-swt-${{ steps.metadata.outputs.image_tag }}
+          path: create-ocp-namespace-swt/src/main/resources/manifests/
+          retention-days: 30
+
+  update-helm-charts:
+    needs: [detect-changes, build-workflow]
+    if: needs.build-workflow.result == 'success' || github.event.inputs.update_charts == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: '3.12.0'
+
+      - name: Download workflow manifests
+        uses: actions/download-artifact@v4
+        with:
+          path: ./downloaded-manifests
+
+      - name: Update Helm chart with generated manifests
+        run: |
+          WORKFLOW="create-ocp-namespace-swt"
+          echo "Updating Helm chart for workflow: $WORKFLOW"
+          
+          # Find the manifest directory for this workflow
+          MANIFEST_DIR=$(find ./downloaded-manifests -name "manifests-$WORKFLOW-*" -type d | head -n 1)
+          
+          if [ -d "$MANIFEST_DIR" ]; then
+            # Copy manifests to chart templates directory (excluding SonataFlow CR and secrets)
+            CHART_DIR="charts/$WORKFLOW"
+            if [ -d "$CHART_DIR" ]; then
+              echo "Copying manifests to $CHART_DIR/templates/"
+              mkdir -p "$CHART_DIR/templates"
+              
+              # Create manifests directory at chart root for Helm template access
+              mkdir -p "$CHART_DIR/manifests"
+              
+              # Copy only the SonataFlow CR to manifests directory for Helm template access
+              # Rename to .yaml.template so Helm ignores it but template can still read it
+              cp "$MANIFEST_DIR"/*-sonataflow_*.yaml "$CHART_DIR/manifests/05-sonataflow_create-ocp-namespace-swt.yaml.template" || true
+            
+            # Copy all other manifests to templates root for direct deployment
+            cp "$MANIFEST_DIR"/*.yaml "$CHART_DIR/templates/" || true
+            
+            # Remove SonataFlow CR and secret files from templates root since they're handled by Helm templates
+            rm -f "$CHART_DIR/templates"/*-sonataflow_*.yaml
+            rm -f "$CHART_DIR/templates"/*-secret_*.yaml
+              
+              # Use the image tag from the build workflow
+              IMAGE_TAG="${{ needs.build-workflow.outputs.image_tag }}"
+              
+              # Update Chart.yaml version using project version
+              CHART_VERSION="$IMAGE_TAG"
+              yq eval ".version = \"$CHART_VERSION\"" -i "$CHART_DIR/Chart.yaml"
+              
+              echo "Releasing Chart with data:"
+              cat "$CHART_DIR/Chart.yaml"
+              
+              # Update values.yaml with new image reference
+              IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/$WORKFLOW"
+              yq eval ".image.repository = \"$IMAGE_NAME\"" -i "$CHART_DIR/values.yaml"
+              yq eval ".image.tag = \"$IMAGE_TAG\"" -i "$CHART_DIR/values.yaml"
+              
+              echo "Updated chart for $WORKFLOW with image $IMAGE_NAME:$IMAGE_TAG"
+            else
+              echo "Warning: Chart directory $CHART_DIR not found for workflow $WORKFLOW"
+            fi
+          else
+            echo "Warning: No manifest directory found for workflow $WORKFLOW"
+          fi
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Run chart-releaser
+        uses: helm/chart-releaser-action@v1.6.0
+        env:
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          CR_SKIP_EXISTING: false
+
+      - name: Commit and push chart updates
+        if: github.ref == 'refs/heads/main'
+        run: |
+          # Check if there are changes to commit
+          if git diff --quiet; then
+            echo "No changes to commit"
+          else
+            # Pull latest changes to avoid conflicts
+            git pull origin main
+            git add charts/
+            git commit -m "Update Helm charts with latest workflow manifests [skip ci]"
+            git push origin main
+          fi
