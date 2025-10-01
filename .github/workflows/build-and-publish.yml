@@ -222,17 +222,19 @@ jobs:
             rm -f "$CHART_DIR/templates"/*-sonataflow_*.yaml
             rm -f "$CHART_DIR/templates"/*-secret_*.yaml
               
+              # Use the image tag from the build workflow
+              IMAGE_TAG="${{ needs.build-workflow.outputs.image_tag }}"
+              
               # Update Chart.yaml version using image tag
               CHART_VERSION="$IMAGE_TAG"
               yq eval ".version = \"$CHART_VERSION\"" -i "$CHART_DIR/Chart.yaml"
+              
               echo "Releasing Chart with data:"
               cat "$CHART_DIR/Chart.yaml"
+              
               # Update values.yaml with new image reference
               IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/$WORKFLOW"
               yq eval ".image.repository = \"$IMAGE_NAME\"" -i "$CHART_DIR/values.yaml"
-              
-              # Extract image tag from manifest directory name
-              IMAGE_TAG=$(echo "$MANIFEST_DIR" | sed 's|.*-||')
               yq eval ".image.tag = \"$IMAGE_TAG\"" -i "$CHART_DIR/values.yaml"
               
               echo "Updated chart for $WORKFLOW with image $IMAGE_NAME:$IMAGE_TAG"
