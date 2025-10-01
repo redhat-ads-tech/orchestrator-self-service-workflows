@@ -1,7 +1,7 @@
 name: Build Workflow, Push Image, and Publish Helm Chart
 
 permissions:
-  contents: read
+  contents: write
   packages: write
   pages: write
 
