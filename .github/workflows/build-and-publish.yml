@@ -225,7 +225,8 @@ jobs:
               # Update Chart.yaml version using image tag
               CHART_VERSION="$IMAGE_TAG"
               yq eval ".version = \"$CHART_VERSION\"" -i "$CHART_DIR/Chart.yaml"
-              
+              echo "Releasing Chart with data:"
+              cat "$CHART_DIR/Chart.yaml"
               # Update values.yaml with new image reference
               IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/$WORKFLOW"
               yq eval ".image.repository = \"$IMAGE_NAME\"" -i "$CHART_DIR/values.yaml"
