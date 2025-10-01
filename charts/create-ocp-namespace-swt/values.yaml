@@ -11,7 +11,7 @@ persistence:
       databaseSchema: create-ocp-namespace-swt
 image:
   repository: ghcr.io/evanshortiss/create-ocp-namespace-swt
-  tag: latest
+  tag: 0.1.0
 # Environment variables for the workflow
 env:
   backstageBackendUrl: ""
