@@ -1,4 +1,4 @@
-name: Build create-ocp-namespace-swt Workflow and Publish Helm Chart
+name: Build Workflow and Publish Helm Chart
 
 on:
   push:
