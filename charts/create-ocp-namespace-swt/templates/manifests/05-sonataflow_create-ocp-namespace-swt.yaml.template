@@ -395,7 +395,7 @@ spec:
           secretKeyRef:
             key: SWT_REF
             name: create-ocp-namespace-swt-secrets
-      image: ghcr.io/evanshortiss/create-ocp-namespace-swt:0.1.0
+      image: ghcr.io/evanshortiss/create-ocp-namespace-swt:0.1.2
       resources: {}
   resources:
     configMaps:
