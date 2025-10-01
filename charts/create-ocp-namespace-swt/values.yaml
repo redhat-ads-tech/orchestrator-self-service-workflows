@@ -10,8 +10,8 @@ persistence:
       databaseName: backstage_plugin_orchestrator
       databaseSchema: create-ocp-namespace-swt
 image:
-  repository: ghcr.io/evanshortiss/create-ocp-namespace-swt
-  tag: 0.1.5
+  repository: ghcr.io/redhat-ads-tech/create-ocp-namespace-swt
+  tag: 0.1.0
 # Environment variables for the workflow
 env:
   backstageBackendUrl: ""
