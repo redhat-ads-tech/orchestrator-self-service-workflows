@@ -3,7 +3,7 @@
 {{- $sonataflow = $sonataflow | set "metadata.name" (include "create-ocp-namespace-swt.fullname" .) -}}
 {{- $sonataflow = $sonataflow | set "metadata.labels" (include "create-ocp-namespace-swt.labels" .) -}}
 {{- $sonataflow = $sonataflow | set "spec.podTemplate.container.image" (printf "%s:%s" .Values.image.repository .Values.image.tag) -}}
-{{- $sonataflow = $sonataflow | set "spec.podTemplate.container.envFrom[0].secretRef.name" (printf "%s-creds" (include "create-ocp-namespace-swt.fullname" .)) -}}
+{{- $sonataflow = $sonataflow | set "spec.podTemplate.container.envFrom" (list (dict "secretRef" (dict "name" (printf "%s-creds" (include "create-ocp-namespace-swt.fullname" .))))) -}}
 {{- if .Values.persistence.postgresql -}}
 {{- $sonataflow = $sonataflow | set "spec.persistence.postgresql.secretRef.name" .Values.persistence.postgresql.secretRef.name -}}
 {{- $sonataflow = $sonataflow | set "spec.persistence.postgresql.secretRef.userKey" .Values.persistence.postgresql.secretRef.userKey -}}
