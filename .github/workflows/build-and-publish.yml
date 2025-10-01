@@ -256,7 +256,9 @@ jobs:
           if git diff --quiet; then
             echo "No changes to commit"
           else
+            # Pull latest changes to avoid conflicts
+            git pull origin main
             git add charts/
             git commit -m "Update Helm charts with latest workflow manifests [skip ci]"
-            git push
+            git push origin main
           fi
