@@ -65,7 +65,7 @@ image:
 EOF
 
 # Install with custom values
-helm install create-ocp-namespace-swt orchestrator-workflows/create-ocp-namespace-swt -f my-values.yaml
+helm install create-ocp-namespace-swt advanced-workflows/create-ocp-namespace-swt -f my-values.yaml
 ```
 
 ### Configuration
