@@ -201,12 +201,12 @@ jobs:
               echo "Copying manifests to $CHART_DIR/templates/"
               mkdir -p "$CHART_DIR/templates"
               
-            # Create manifests subdirectory for Helm template access
-            mkdir -p "$CHART_DIR/templates/manifests"
-            
-            # Copy only the SonataFlow CR to manifests subdirectory for Helm template access
-            # Rename to .yaml.template so Helm ignores it but template can still read it
-            cp "$MANIFEST_DIR"/*-sonataflow_*.yaml "$CHART_DIR/templates/manifests/05-sonataflow_create-ocp-namespace-swt.yaml.template" || true
+              # Create manifests directory at chart root for Helm template access
+              mkdir -p "$CHART_DIR/manifests"
+              
+              # Copy only the SonataFlow CR to manifests directory for Helm template access
+              # Rename to .yaml.template so Helm ignores it but template can still read it
+              cp "$MANIFEST_DIR"/*-sonataflow_*.yaml "$CHART_DIR/manifests/05-sonataflow_create-ocp-namespace-swt.yaml.template" || true
             
             # Copy all other manifests to templates root for direct deployment
             cp "$MANIFEST_DIR"/*.yaml "$CHART_DIR/templates/" || true
