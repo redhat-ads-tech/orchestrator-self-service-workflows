@@ -146,9 +146,6 @@ jobs:
           export WORKFLOW_IMAGE_REGISTRY="${{ env.REGISTRY }}"
           export WORKFLOW_IMAGE_NAMESPACE="${{ env.IMAGE_NAMESPACE }}"
           export WORKFLOW_IMAGE_TAG="${{ steps.metadata.outputs.image_tag }}"
-          export FLOW_NAME="${{ steps.metadata.outputs.flow_name }}"
-          export FLOW_SUMMARY="${{ steps.metadata.outputs.flow_summary }}"
-          export FLOW_DESCRIPTION="${{ steps.metadata.outputs.flow_description }}"
           
           chmod +x scripts/build-push.sh
           ./scripts/build-push.sh

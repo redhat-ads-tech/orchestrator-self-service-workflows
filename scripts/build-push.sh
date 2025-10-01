@@ -20,6 +20,21 @@ if [[ -z "${WORKFLOW_IMAGE_TAG}" ]]; then
   exit 1
 fi
 
+# Hardcoded flow metadata for create-ocp-namespace-swt
+FLOW_NAME="create-ocp-namespace-swt Serverless Workflow"
+FLOW_SUMMARY="create-ocp-namespace-swt Serverless Workflow"
+FLOW_DESCRIPTION="create-ocp-namespace-swt workflow creates a namespace on behalf of an OpenShift user, using a software template"
+
+WORKDIR=$(mktemp -d)
+echo "Workdir: ${WORKDIR}"
+
+cp -r . ${WORKDIR}
+
+cd "${WORKDIR}"
+
+rm -rf **/target
+mv ${WORKFLOW_FOLDER}/src/main/resources ${WORKFLOW_FOLDER}/.
+
 IMAGE_NAME=${WORKFLOW_IMAGE_REGISTRY}/${WORKFLOW_IMAGE_NAMESPACE}/${WORKFLOW_ID}
 IMAGE_TAG=${WORKFLOW_IMAGE_TAG}
 
