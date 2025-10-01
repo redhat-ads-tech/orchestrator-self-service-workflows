@@ -49,7 +49,7 @@ jobs:
         run: |
           # Check if create-ocp-namespace-swt workflow or related files changed
           WORKFLOW_CHANGED="false"
-          if git diff --name-only HEAD~1 HEAD | grep -E "^(create-ocp-namespace-swt/|resources/|scripts/)" > /dev/null; then
+          if git diff --name-only HEAD~1 HEAD | grep -E "^(create-ocp-namespace-swt/|resources/|scripts/|create-ocp-namespace-swt/pom.xml)" > /dev/null; then
             WORKFLOW_CHANGED="true"
           fi
           
