@@ -38,5 +38,5 @@ mv ${WORKFLOW_FOLDER}/src/main/resources ${WORKFLOW_FOLDER}/.
 IMAGE_NAME=${WORKFLOW_IMAGE_REGISTRY}/${WORKFLOW_IMAGE_NAMESPACE}/${WORKFLOW_ID}
 IMAGE_TAG=${WORKFLOW_IMAGE_TAG}
 
-podman build -f resources/workflow-builder.Dockerfile --no-cache --build-arg WF_RESOURCES="${WORKFLOW_FOLDER}" --build-arg FLOW_NAME="${FLOW_NAME}" --build-arg FLOW_SUMMARY="${FLOW_SUMMARY}" --build-arg FLOW_DESCRIPTION="${FLOW_DESCRIPTION}" --ulimit nofile=4096:4096 --tag "${IMAGE_NAME}:${IMAGE_TAG}" --tag "${IMAGE_NAME}:latest" .
+podman build -f resources/workflow-builder.Dockerfile --no-cache --build-arg WF_RESOURCES="${WORKFLOW_FOLDER}" --build-arg FLOW_NAME="${FLOW_NAME}" --build-arg FLOW_SUMMARY="${FLOW_SUMMARY}" --build-arg FLOW_DESCRIPTION="${FLOW_DESCRIPTION}" --ulimit nofile=4096:4096 --tag "${IMAGE_NAME}:${IMAGE_TAG}" .
 podman push "${IMAGE_NAME}:latest"
