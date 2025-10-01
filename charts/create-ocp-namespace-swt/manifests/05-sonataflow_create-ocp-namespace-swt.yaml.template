@@ -389,13 +389,7 @@ spec:
       type: operation
   podTemplate:
     container:
-      env:
-      - name: SWT_REF
-        valueFrom:
-          secretKeyRef:
-            key: SWT_REF
-            name: create-ocp-namespace-swt-secrets
-      image: ghcr.io/evanshortiss/create-ocp-namespace-swt:0.1.4
+      image: ghcr.io/evanshortiss/create-ocp-namespace-swt:0.1.5
       resources: {}
   resources:
     configMaps:
