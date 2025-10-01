@@ -1,5 +1,8 @@
 name: Build Workflow, Push Image, and Publish Helm Chart
 
+permissions:
+  contents: write
+
 on:
   push:
     branches: [ main, develop ]
