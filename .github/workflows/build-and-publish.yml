@@ -63,12 +63,18 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             if [ "${{ github.event.inputs.build_container }}" = "true" ]; then
               WORKFLOW_CHANGED="true"
+              CHARTS_CHANGED="true"  # Charts should always be updated when workflow builds
             fi
             if [ "${{ github.event.inputs.update_charts }}" = "true" ]; then
               CHARTS_CHANGED="true"
             fi
           # If no specific changes detected, build on main branch
           elif [ "${{ github.ref }}" = "refs/heads/main" ] && [ "$WORKFLOW_CHANGED" = "false" ]; then
+            CHARTS_CHANGED="true"
+          fi
+          
+          # Charts should always be updated when workflow changes
+          if [ "$WORKFLOW_CHANGED" = "true" ]; then
             CHARTS_CHANGED="true"
           fi
           
