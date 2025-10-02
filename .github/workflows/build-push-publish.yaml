@@ -94,9 +94,12 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.metadata.outputs.image_tag }}
+      is_new_version: ${{ steps.check-version.outputs.is_new_version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history to check tags
 
       - name: Set up Podman
         run: |
@@ -135,12 +138,28 @@ jobs:
           
           echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
           echo "image_name=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/create-ocp-namespace-swt" >> $GITHUB_OUTPUT
+          echo "Project version: $PROJECT_VERSION"
+
+      - name: Check if version is new
+        id: check-version
+        run: |
+          VERSION="${{ steps.metadata.outputs.image_tag }}"
+          
+          # Check if a git tag exists for this version
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "is_new_version=false" >> $GITHUB_OUTPUT
+            echo "Version v$VERSION already exists - will only update 'latest' tag"
+          else
+            echo "is_new_version=true" >> $GITHUB_OUTPUT
+            echo "Version v$VERSION is new - will create versioned release"
+          fi
 
       - name: Build and push workflow image
         run: |
           export WORKFLOW_IMAGE_REGISTRY="${{ env.REGISTRY }}"
           export WORKFLOW_IMAGE_NAMESPACE="${{ env.IMAGE_NAMESPACE }}"
           export WORKFLOW_IMAGE_TAG="${{ steps.metadata.outputs.image_tag }}"
+          export PUSH_VERSION_TAG="${{ steps.check-version.outputs.is_new_version }}"
           
           chmod +x scripts/build-push.sh
           ./scripts/build-push.sh
@@ -164,7 +183,7 @@ jobs:
 
   update-helm-charts:
     needs: [detect-changes, build-workflow]
-    if: needs.build-workflow.result == 'success' || github.event.inputs.update_charts == 'true'
+    if: (needs.build-workflow.result == 'success' && needs.build-workflow.outputs.is_new_version == 'true') || github.event.inputs.update_charts == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -258,3 +277,11 @@ jobs:
             git commit -m "Update Helm charts with latest workflow manifests [skip ci]"
             git push origin main
           fi
+
+      - name: Create version tag
+        if: github.ref == 'refs/heads/main' && needs.build-workflow.outputs.is_new_version == 'true'
+        run: |
+          VERSION="${{ needs.build-workflow.outputs.image_tag }}"
+          git tag -a "v$VERSION" -m "Release version $VERSION"
+          git push origin "v$VERSION"
+          echo "Created and pushed git tag v$VERSION"
