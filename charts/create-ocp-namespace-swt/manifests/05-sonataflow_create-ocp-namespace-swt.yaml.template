@@ -389,7 +389,7 @@ spec:
       type: operation
   podTemplate:
     container:
-      image: ghcr.io/redhat-ads-tech/create-ocp-namespace-swt:0.1.6
+      image: ghcr.io/redhat-ads-tech/create-ocp-namespace-swt:0.1.7
       resources: {}
   resources:
     configMaps:
