@@ -11,7 +11,7 @@ persistence:
       databaseSchema: create-ocp-namespace-swt
 image:
   repository: ghcr.io/redhat-ads-tech/create-ocp-namespace-swt
-  tag: 0.1.4
+  tag: 0.1.6
 # Environment variables for the workflow
 env:
   backstageBackendUrl: ""
