@@ -19,7 +19,7 @@ data:
     \     \"items\": {\n        \"title\": \"Recipient\",\n        \"type\": \"string\",\n
     \       \"pattern\": \"^(user|group):[a-z0-9]([-a-z0-9]*[a-z0-9])?/([a-z0-9]([-a-z0-9]*[a-z0-9])?)$\"\n
     \     },\n      \"minItems\": 1\n    }\n  },\n  \"required\": [\n    \"namespace\",\n
-    \   \"requester\",\n    \"size\",\n    \"reason\",\n    \"recipients\"\n  ]\n}"
+    \   \"requester\",\n    \"size\",\n    \"recipients\"\n  ]\n}"
   workflow-output-schema.json: |-
     {
         "$schema": "http://json-schema.org/draft-07/schema#",
