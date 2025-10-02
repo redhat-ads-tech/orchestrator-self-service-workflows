@@ -39,8 +39,6 @@ command -v kubectl
 
 cd "${WORKFLOW_FOLDER}"/src/main/resources
 
-echo -e "\nquarkus.flyway.migrate-at-start=true" >> application.properties
-
 MANIFEST_DIR="${WORKDIR}/${WORKFLOW_FOLDER}/src/main/resources/manifests"
 mkdir -p "${MANIFEST_DIR}"
 kn-workflow gen-manifest --image "${WORKFLOW_IMAGE_REGISTRY}/${WORKFLOW_IMAGE_NAMESPACE}/${WORKFLOW_IMAGE_REPO}:${WORKFLOW_IMAGE_TAG}" --profile gitops --skip-namespace --custom-generated-manifests-dir="${MANIFEST_DIR}" 
