@@ -130,15 +130,6 @@ jobs:
           # Extract version from pom.xml
           PROJECT_VERSION=$(grep -A1 '<artifactId>create-ocp-namespace-swt</artifactId>' "$WORKFLOW_DIR/pom.xml" | grep '<version>' | sed 's/.*<version>\(.*\)<\/version>.*/\1/')
           
-          # Hardcoded flow metadata
-          FLOW_NAME="create-ocp-namespace-swt Serverless Workflow"
-          FLOW_SUMMARY="create-ocp-namespace-swt Serverless Workflow"
-          FLOW_DESCRIPTION="create-ocp-namespace-swt workflow creates a namespace on behalf of an OpenShift user, using a software template"
-          
-          echo "flow_name=$FLOW_NAME" >> $GITHUB_OUTPUT
-          echo "flow_summary=$FLOW_SUMMARY" >> $GITHUB_OUTPUT
-          echo "flow_description=$FLOW_DESCRIPTION" >> $GITHUB_OUTPUT
-          
           # Use project version for image tag
           IMAGE_TAG="$PROJECT_VERSION"
           
