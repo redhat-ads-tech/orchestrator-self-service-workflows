@@ -2,6 +2,15 @@ apiVersion: v1
 entries:
   create-ocp-namespace-swt:
   - apiVersion: v2
+    created: "2025-10-03T01:30:56.277116521Z"
+    description: A Helm chart for Kubernetes
+    digest: fc9a660f97d769e9ddb989f836407cfc5bfc277fbe3ced3fecdbe027e7004cc8
+    name: create-ocp-namespace-swt
+    type: application
+    urls:
+    - https://github.com/redhat-ads-tech/orchestrator-self-service-workflows/releases/download/create-ocp-namespace-swt-0.1.9/create-ocp-namespace-swt-0.1.9.tgz
+    version: 0.1.9
+  - apiVersion: v2
     created: "2025-10-03T00:42:16.013357227Z"
     description: A Helm chart for Kubernetes
     digest: 0fa1f09abf8f25348bf5fd93bc850917c787f2fca5cfec42a46a572b5e9c9605
@@ -73,4 +82,4 @@ entries:
     urls:
     - https://github.com/redhat-ads-tech/orchestrator-serverless-workflows/releases/download/create-ocp-namespace-swt-0.1.0/create-ocp-namespace-swt-0.1.0.tgz
     version: 0.1.0
-generated: "2025-10-03T00:42:16.013407581Z"
+generated: "2025-10-03T01:30:56.277154953Z"
