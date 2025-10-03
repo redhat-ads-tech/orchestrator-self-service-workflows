@@ -189,6 +189,7 @@ spec:
             templateRef: $SECRET.SWT_REF
             values:
               component_id: .namespace
+              git_host: .git_host
               namespace_owner: .requester
               size: .size
           invoke: sync
@@ -297,7 +298,7 @@ spec:
             payload:
               description: '"Namespace " + .namespace + " could not be created"'
               severity: high
-              title: '"Namespace " + ..namespace + " could not be created"'
+              title: '"Namespace " + .namespace + " could not be created"'
               topic: Create OCP Namespace workflow
             recipients:
               entityRef: .recipients
@@ -397,7 +398,7 @@ spec:
       type: operation
   podTemplate:
     container:
-      image: ghcr.io/redhat-ads-tech/create-ocp-namespace-swt:0.1.10
+      image: ghcr.io/redhat-ads-tech/create-ocp-namespace-swt:0.1.11
       resources: {}
   resources:
     configMaps:
