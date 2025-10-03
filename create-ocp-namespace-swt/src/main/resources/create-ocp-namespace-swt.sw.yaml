@@ -301,6 +301,13 @@ states:
   - actionMode: sequential
     actions:
       - actionDataFilter:
+          useResults: true
+        functionRef:
+          arguments:
+            message: .getProjectIdResult|tojson
+          invoke: sync
+          refName: logInfo
+      - actionDataFilter:
           toStateData: .closeIssueResult
           useResults: true
         functionRef:
