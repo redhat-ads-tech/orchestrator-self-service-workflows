@@ -53,6 +53,6 @@
     "requester",
     "size",
     "git_host",
-    "recipients",
+    "recipients"
   ]
 }
