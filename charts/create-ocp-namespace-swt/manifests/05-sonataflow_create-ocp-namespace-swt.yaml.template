@@ -95,7 +95,7 @@ spec:
           useResults: true
         functionRef:
           arguments:
-            search: rhdh-issues
+            search: operator-approvals
             simple: true
           invoke: sync
           refName: getProjectId
@@ -325,6 +325,13 @@ spec:
     - actionMode: sequential
       actions:
       - actionDataFilter:
+          useResults: true
+        functionRef:
+          arguments:
+            message: .getProjectIdResult|tojson
+          invoke: sync
+          refName: logInfo
+      - actionDataFilter:
           toStateData: .closeIssueResult
           useResults: true
         functionRef:
@@ -390,7 +397,7 @@ spec:
       type: operation
   podTemplate:
     container:
-      image: ghcr.io/redhat-ads-tech/create-ocp-namespace-swt:0.1.8
+      image: ghcr.io/redhat-ads-tech/create-ocp-namespace-swt:0.1.9
       resources: {}
   resources:
     configMaps:
