@@ -75,7 +75,7 @@ states:
           useResults: true
         functionRef:
           arguments:
-            search: operator-approvals
+            search: orchestrator-approvals
             simple: true
           invoke: sync
           refName: getProjectId
