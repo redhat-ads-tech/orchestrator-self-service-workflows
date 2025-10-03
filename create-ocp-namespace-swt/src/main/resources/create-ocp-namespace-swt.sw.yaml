@@ -183,6 +183,7 @@ states:
           arguments:
             templateRef: $SECRET.SWT_REF
             values:
+              git_host: .git_host
               component_id: .namespace
               namespace_owner: .requester
               size: .size
