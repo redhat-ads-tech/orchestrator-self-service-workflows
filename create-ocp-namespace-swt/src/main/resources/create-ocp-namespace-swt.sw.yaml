@@ -75,7 +75,7 @@ states:
           useResults: true
         functionRef:
           arguments:
-            search: rhdh-issues
+            search: operator-approvals
             simple: true
           invoke: sync
           refName: getProjectId
