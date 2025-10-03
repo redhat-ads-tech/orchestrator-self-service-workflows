@@ -296,7 +296,7 @@ spec:
             payload:
               description: '"Namespace " + .namespace + " could not be created"'
               severity: high
-              title: '"Namespace " + ..namespace + " could not be created"'
+              title: '"Namespace " + .namespace + " could not be created"'
               topic: Create OCP Namespace workflow
             recipients:
               entityRef: .recipients
